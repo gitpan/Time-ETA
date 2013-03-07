@@ -1,0 +1,16 @@
+Changes
+LICENSE
+MANIFEST
+META.yml
+Makefile.PL
+dist.ini
+examples/original_sript.pl
+examples/script_with_eta.pl
+lib/Time/ETA.pm
+t/_integer_cheking.t
+t/author-changes.t
+t/author-whitespaces.t
+t/errors.t
+t/serialization_api.t
+t/serialization_errors.t
+t/usage.t

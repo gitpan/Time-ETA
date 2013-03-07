@@ -1,0 +1,26 @@
+---
+abstract: 'calculate estimated time of accomplishment'
+author:
+  - 'Ivan Bessarabov <ivan@bessarabov.ru>'
+build_requires:
+  Test::More: 0
+configure_requires:
+  ExtUtils::MakeMaker: 6.30
+dynamic_config: 0
+generated_by: 'Dist::Zilla version 4.300030, CPAN::Meta::Converter version 2.120921'
+license: perl
+meta-spec:
+  url: http://module-build.sourceforge.net/META-spec-v1.4.html
+  version: 1.4
+name: Time-ETA
+requires:
+  Carp: 0
+  Time::HiRes: 0
+  YAML: 0
+  strict: 0
+  warnings: 0
+resources:
+  bugtracker: https://github.com/bessarabov/Time-ETA/issues
+  homepage: https://github.com/bessarabov/Time-ETA
+  repository: https://github.com/bessarabov/Time-ETA.git
+version: 0.01
