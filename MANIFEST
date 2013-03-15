@@ -3,10 +3,14 @@ LICENSE
 MANIFEST
 META.yml
 Makefile.PL
+README
 dist.ini
 examples/original_sript.pl
 examples/script_with_eta.pl
+examples/visualise.pl
 lib/Time/ETA.pm
+new
+old
 t/_integer_cheking.t
 t/author-changes.t
 t/author-whitespaces.t

@@ -1,6 +1,6 @@
 package Time::ETA;
 {
-  $Time::ETA::VERSION = '0.01';
+  $Time::ETA::VERSION = '0.02';
 }
 
 # ABSTRACT: calculate estimated time of accomplishment
@@ -20,7 +20,7 @@ use YAML;
 my $true = 1;
 my $false = '';
 
-my $serialization_api_version = 1;
+our $SERIALIZATION_API_VERSION = 2;
 
 
 sub new {
@@ -42,7 +42,13 @@ sub new {
 sub get_elapsed_seconds {
     my ($self) = @_;
 
-    my $elapsed_seconds = tv_interval($self->{_start}, [gettimeofday]);
+    my $elapsed_seconds;
+
+    if ($self->is_completed()) {
+        $elapsed_seconds = tv_interval($self->{_start}, $self->{_end});
+    } else {
+        $elapsed_seconds = tv_interval($self->{_start}, [gettimeofday]);
+    }
 
     return $elapsed_seconds;
 }
@@ -53,11 +59,15 @@ sub get_remaining_seconds {
 
     croak "There is not enough data to calculate estimated time of accomplishment. Stopped" if not $self->can_calculate_eta();
 
-    my $elapsed_seconds = $self->get_elapsed_seconds();
+    return 0 if $self->is_completed();
+
+    my $elapsed_before_milestone = tv_interval($self->{_start}, $self->{_miliestone_pass});
+    my $elapsed_after_milestone = tv_interval($self->{_miliestone_pass}, [gettimeofday()]);
+
     my $remaining_milestones = $self->{_milestones} - $self->{_passed_milestones};
 
-    my $one_milestone_completion_time = $elapsed_seconds/$self->{_passed_milestones};
-    my $remaining_seconds = $one_milestone_completion_time * $remaining_milestones;
+    my $one_milestone_completion_time = $elapsed_before_milestone/$self->{_passed_milestones};
+    my $remaining_seconds = ($one_milestone_completion_time * $remaining_milestones) - $elapsed_after_milestone;
 
     return $remaining_seconds;
 }
@@ -72,6 +82,16 @@ sub get_completed_percent {
 }
 
 
+sub is_completed {
+    my ($self) = @_;
+
+    return ($self->{_passed_milestones} == $self->{_milestones})
+        ? $true
+        : $false
+        ;
+}
+
+
 sub pass_milestone {
     my ($self) = @_;
 
@@ -80,6 +100,15 @@ sub pass_milestone {
     } else {
         croak "You have already completed all milestones. It it incorrect to run pass_milestone() now. Stopped";
     }
+
+    my $dt = [gettimeofday];
+
+    $self->{_miliestone_pass} = $dt;
+
+    if ($self->{_passed_milestones} == $self->{_milestones}) {
+        $self->{_end} = $dt;
+    }
+
     return $false;
 }
 
@@ -99,10 +128,12 @@ sub serialize {
     my ($self) = @_;
 
     my $data = {
-        _version => $serialization_api_version,
+        _version => $SERIALIZATION_API_VERSION,
         _milestones => $self->{_milestones},
         _passed_milestones => $self->{_passed_milestones},
         _start  => $self->{_start},
+        _miliestone_pass => $self->{_miliestone_pass},
+        _end  => $self->{_end},
     };
 
     my $string = Dump($data);
@@ -130,8 +161,8 @@ sub spawn {
 
     croak "Can't spawn object. Serialized data does not contain version. Stopped" if not defined $data->{_version};
 
-    croak "Can't spawn object. Version $Time::ETA::VERSION can work only with serialized data version $serialization_api_version. Stopped"
-        if $data->{_version} ne $serialization_api_version;
+    croak "Can't spawn object. Version $Time::ETA::VERSION can work only with serialized data version $SERIALIZATION_API_VERSION. Stopped"
+        if $data->{_version} ne $SERIALIZATION_API_VERSION;
 
     croak "Can't spawn object. Serialized data contains incorrect number of milestones. Stopped"
         if not _is_positive_integer(undef, $data->{_milestones});
@@ -139,24 +170,56 @@ sub spawn {
     croak "Can't spawn object. Serialized data contains incorrect number of passed milestones. Stopped"
         if not _is_positive_integer_or_zero(undef, $data->{_passed_milestones});
 
-    croak "Can't spawn object. Serialized data contains incorrect data for start time. Stopped"
-        if ref $data->{_start} ne "ARRAY";
+    _check_gettimeofday(
+        undef,
+        value => $data->{_start},
+        name => "start time"
+    );
 
-    croak "Can't spawn object. Serialized data contains incorrect seconds in start time. Stopped"
-        if not _is_positive_integer_or_zero(undef, $data->{_start}->[0]);
+    if (defined $data->{_end}) {
+        _check_gettimeofday(
+            undef,
+            value => $data->{_end},
+            name => "end time"
+        );
+    }
 
-    croak "Can't spawn object. Serialized data contains incorrect microseconds in start time. Stopped"
-        if not _is_positive_integer_or_zero(undef, $data->{_start}->[1]);
+    if (defined $data->{_miliestone_pass}) {
+        _check_gettimeofday(
+            undef,
+            value => $data->{_miliestone_pass},
+            name => "last milestone pass time"
+        );
+    }
 
     my $self = {
         _milestones => $data->{_milestones},
         _passed_milestones => $data->{_passed_milestones},
         _start  => $data->{_start},
+        _miliestone_pass => $data->{_miliestone_pass},
+        _end  => $data->{_end},
     };
 
     bless $self, $class;
 
     return $self;
+}
+
+sub _check_gettimeofday {
+    my ($self, %params) = @_;
+
+    croak "Expected to get 'name'" unless defined $params{name};
+
+    croak "Can't spawn object. Serialized data contains incorrect data for $params{name}. Stopped"
+        if ref $params{value} ne "ARRAY";
+
+    croak "Can't spawn object. Serialized data contains incorrect seconds in $params{name}. Stopped"
+        if not _is_positive_integer_or_zero(undef, $params{value}->[0]);
+
+    croak "Can't spawn object. Serialized data contains incorrect microseconds in $params{name}. Stopped"
+        if not _is_positive_integer_or_zero(undef, $params{value}->[1]);
+
+    return $false;
 }
 
 sub _is_positive_integer_or_zero {
@@ -199,7 +262,7 @@ Time::ETA - calculate estimated time of accomplishment
 
 =head1 VERSION
 
-version 0.01
+version 0.02
 
 =head1 SYNOPSIS
 
@@ -215,7 +278,7 @@ version 0.01
         print "Will work " . $eta->get_remaining_seconds() . " seconds more\n";
     }
 
-=head2 DESCRIPTION
+=head1 DESCRIPTION
 
 You have a long lasting progress that consist of the number of more or less
 equal tasks. You need to calculate when the progress will finish. This module
@@ -233,7 +296,7 @@ tasks) and after each task you run pass_milestone() method to tell Time::ETA
 object that you have completed part of your process.
 
 Any time in you programme you can use methods to understand what is going on
-and how soon the process will finish. That are methods
+and how soon the process will finish. That are methods is_completed(),
 get_completed_percent(), get_elapsed_seconds(), get_remaining_seconds().
 
 This module has build-in feature for serialisation. You can run method
@@ -273,6 +336,9 @@ Method return number of seconds that have passed from object creation time.
 It can output something like 1.35024 and it means that a bit more than one
 second have passed from the moment the new() constructor has executed.
 
+If the process is finished this method will return process run time in
+seconds.
+
 =head2 get_remaining_seconds
 
 B<Get:> 1) $self
@@ -294,6 +360,8 @@ is run for the first time. AFter pass_milestone() run at least once,
 get_remaining_seconds() has enouth data to caluate ETA. To find out if ETA can
 be calculated you can use method can_calculate_eta().
 
+If the process is finished this method will return 0.
+
 =head2 get_completed_percent
 
 B<Get:> 1) $self
@@ -309,6 +377,16 @@ have been passed.
 
 For example, if one milestone from 12 have been completed it will print
 8.33333333333333
+
+=head2 is_completed
+
+B<Get:> 1) $self
+
+B<Return:> 1) $boolean - true value if the process is completed or false value
+if the process is running.
+
+You can also use get_completed_percent() to find our how much of the process
+is finished.
 
 =head2 pass_milestone
 
@@ -345,6 +423,9 @@ no data to calculate ETA.
         print $eta->get_remaining_seconds();
     }
 
+When the process is complete can_calculate_eta() returns true value, but
+get_remaining_seconds() return 0.
+
 =head2 serialize
 
 B<Get:> 1) $self
@@ -378,7 +459,19 @@ The $string is created by the method serialized().
 
 =over
 
+=item L<PBS::ProgressBar>
+
+=item L<Progress::Any>
+
+=item L<Progress::PV>
+
+=item L<Term::ProgressBar::Quiet>
+
+=item L<Term::ProgressBar::Simple>
+
 =item L<Term::ProgressBar>
+
+=item L<Text::ProgressBar::ETA>
 
 =item L<Time::Progress>
 
