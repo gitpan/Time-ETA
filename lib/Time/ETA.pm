@@ -1,6 +1,6 @@
 package Time::ETA;
 {
-  $Time::ETA::VERSION = '0.02';
+  $Time::ETA::VERSION = '0.03';
 }
 
 # ABSTRACT: calculate estimated time of accomplishment
@@ -70,6 +70,15 @@ sub get_remaining_seconds {
     my $remaining_seconds = ($one_milestone_completion_time * $remaining_milestones) - $elapsed_after_milestone;
 
     return $remaining_seconds;
+}
+
+
+sub get_remaining_time {
+    my ($self) = @_;
+
+    my $time = $self->_get_time_from_seconds($self->get_remaining_seconds());
+
+    return $time;
 }
 
 
@@ -145,7 +154,7 @@ sub serialize {
 sub spawn {
     my ($class, $string) = @_;
 
-    croak "Can't spawn object. No serialized data specified. Stopped" if not defined $string;
+    croak "Can't spawn Time::ETA object. No serialized data specified. Stopped" if not defined $string;
 
     my $data;
 
@@ -154,20 +163,20 @@ sub spawn {
     };
 
     if ($@) {
-        croak "Can't spawn object. Got error from YAML parser:\n" . $@ . "Stopped";
+        croak "Can't spawn Time::ETA object. Got error from YAML parser:\n" . $@ . "Stopped";
     }
 
-    croak "Can't spawn object. Got incorrect serialized data. Stopped" if ref $data ne "HASH";
+    croak "Can't spawn Time::ETA object. Got incorrect serialized data. Stopped" if ref $data ne "HASH";
 
-    croak "Can't spawn object. Serialized data does not contain version. Stopped" if not defined $data->{_version};
+    croak "Can't spawn Time::ETA object. Serialized data does not contain version. Stopped" if not defined $data->{_version};
 
-    croak "Can't spawn object. Version $Time::ETA::VERSION can work only with serialized data version $SERIALIZATION_API_VERSION. Stopped"
+    croak "Can't spawn Time::ETA object. Version $Time::ETA::VERSION can work only with serialized data version $SERIALIZATION_API_VERSION. Stopped"
         if $data->{_version} ne $SERIALIZATION_API_VERSION;
 
-    croak "Can't spawn object. Serialized data contains incorrect number of milestones. Stopped"
+    croak "Can't spawn Time::ETA object. Serialized data contains incorrect number of milestones. Stopped"
         if not _is_positive_integer(undef, $data->{_milestones});
 
-    croak "Can't spawn object. Serialized data contains incorrect number of passed milestones. Stopped"
+    croak "Can't spawn Time::ETA object. Serialized data contains incorrect number of passed milestones. Stopped"
         if not _is_positive_integer_or_zero(undef, $data->{_passed_milestones});
 
     _check_gettimeofday(
@@ -205,18 +214,33 @@ sub spawn {
     return $self;
 }
 
+
+sub can_spawn {
+    my ($class, $string) = @_;
+
+    eval {
+        my $eta = spawn($class, $string);
+    };
+
+    if (not $@) {
+        return $true;
+    } else {
+        return $false;
+    }
+}
+
 sub _check_gettimeofday {
     my ($self, %params) = @_;
 
     croak "Expected to get 'name'" unless defined $params{name};
 
-    croak "Can't spawn object. Serialized data contains incorrect data for $params{name}. Stopped"
+    croak "Can't spawn Time::ETA object. Serialized data contains incorrect data for $params{name}. Stopped"
         if ref $params{value} ne "ARRAY";
 
-    croak "Can't spawn object. Serialized data contains incorrect seconds in $params{name}. Stopped"
+    croak "Can't spawn Time::ETA object. Serialized data contains incorrect seconds in $params{name}. Stopped"
         if not _is_positive_integer_or_zero(undef, $params{value}->[0]);
 
-    croak "Can't spawn object. Serialized data contains incorrect microseconds in $params{name}. Stopped"
+    croak "Can't spawn Time::ETA object. Serialized data contains incorrect microseconds in $params{name}. Stopped"
         if not _is_positive_integer_or_zero(undef, $params{value}->[1]);
 
     return $false;
@@ -249,6 +273,32 @@ sub _is_positive_integer {
     return _is_positive_integer_or_zero(undef, $maybe_number);
 }
 
+sub _get_time_from_seconds {
+    my ($self, $input_sec) = @_;
+
+    my $text;
+    {
+        # This is a quick solution. This like make code more robust.
+        # With this like the code will fail if $input_sec is not a number.
+        use warnings FATAL => 'all';
+
+        my $left_sec;
+        my $hour = int($input_sec/3600);
+        $left_sec = $input_sec - ($hour * 3600);
+
+        my $min = int($left_sec/60);
+        $left_sec = $left_sec - ($min * 60);
+
+        $text =
+            sprintf("%01d", $hour) . ":"
+            . sprintf("%02d", $min) . ":"
+            . sprintf("%02d", $left_sec)
+            ;
+    }
+
+    return $text;
+}
+
 
 1;
 
@@ -262,7 +312,7 @@ Time::ETA - calculate estimated time of accomplishment
 
 =head1 VERSION
 
-version 0.02
+version 0.03
 
 =head1 SYNOPSIS
 
@@ -360,7 +410,31 @@ is run for the first time. AFter pass_milestone() run at least once,
 get_remaining_seconds() has enouth data to caluate ETA. To find out if ETA can
 be calculated you can use method can_calculate_eta().
 
+There is one more method that you can use to get information about remaining
+time. The method is called get_remaining_time(). It return the time in format
+"H:MM:SS" and works exaclty as this method.
+
 If the process is finished this method will return 0.
+
+=head2 get_remaining_time
+
+B<Get:> 1) $self
+
+B<Return:> 1) $text_time - scalar with the text representation of remaing
+time.
+
+Method return estimated time in the form "H:MM:SS". For example it can return
+"12:04:44", it means that the process is expected to finish in 12 hours, 4
+minutes and 44 seconds.
+
+This method returns the same number as get_remaining_seconds(), but in format
+that is easy for humans to understand.
+
+Method words the same as get_remaining_seconds(). In case it is not possible
+to calulate remaining time the method will die. You can use method
+can_calculate_eta() to find out if it is possible to get remaing time.
+
+If the process is finished this method will return "0:00:00".
 
 =head2 get_completed_percent
 
@@ -375,8 +449,8 @@ have been passed.
 
     $eta->get_completed_percent();
 
-For example, if one milestone from 12 have been completed it will print
-8.33333333333333
+For example, if one milestone from 12 have been completed the method will
+return 8.33333333333333
 
 =head2 is_completed
 
@@ -454,6 +528,22 @@ serialized object data and creates an object.
     my $eta = Time::ETA->spawn($string);
 
 The $string is created by the method serialized().
+
+spawn() die if $string is incorrect. You can check if it is possible to
+respawn object from a $string with the method can_cpawn().
+
+=head2 can_spawn
+
+B<Get:> 1) $class 2) $string with serialized object
+
+B<Return:> 1) $bool - true value if it is possible to recreate object from
+serialized $string, otherwise false value
+
+    my $can_spawn = Time::ETA->can_spawn($string);
+
+Methos spawn() that is used to create object from the serialized $string dies
+in case the $string is incorrect. This method is added to the object to simply
+the check process.
 
 =head1 SEE ALSO
 

@@ -1,1 +1,0 @@
-perl -I/home/bessarabov/tmp/delete_after_2013-03-15/Time-ETA/lib ./examples/visualise.pl
