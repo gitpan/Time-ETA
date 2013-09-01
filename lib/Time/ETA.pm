@@ -1,6 +1,6 @@
 package Time::ETA;
 {
-  $Time::ETA::VERSION = '0.03';
+  $Time::ETA::VERSION = '1.0.0';
 }
 
 # ABSTRACT: calculate estimated time of accomplishment
@@ -312,7 +312,7 @@ Time::ETA - calculate estimated time of accomplishment
 
 =head1 VERSION
 
-version 0.03
+version 1.0.0
 
 =head1 SYNOPSIS
 
@@ -352,6 +352,9 @@ get_completed_percent(), get_elapsed_seconds(), get_remaining_seconds().
 This module has build-in feature for serialisation. You can run method
 serialize() to get the text string with the object state. And you can restore
 your object from that string with spawn() method.
+
+Time::ETA version numbers uses Semantic Versioning standart.
+Please visit L<http://semver.org/> to find out all about this great thing.
 
 =head1 METHODS
 
