@@ -1,6 +1,6 @@
 package Time::ETA;
 {
-  $Time::ETA::VERSION = '1.0.0';
+  $Time::ETA::VERSION = '1.0.1';
 }
 
 # ABSTRACT: calculate estimated time of accomplishment
@@ -170,7 +170,8 @@ sub spawn {
 
     croak "Can't spawn Time::ETA object. Serialized data does not contain version. Stopped" if not defined $data->{_version};
 
-    croak "Can't spawn Time::ETA object. Version $Time::ETA::VERSION can work only with serialized data version $SERIALIZATION_API_VERSION. Stopped"
+    my $v = _get_version();
+    croak "Can't spawn Time::ETA object. Version $v can work only with serialized data version $SERIALIZATION_API_VERSION. Stopped"
         if $data->{_version} ne $SERIALIZATION_API_VERSION;
 
     croak "Can't spawn Time::ETA object. Serialized data contains incorrect number of milestones. Stopped"
@@ -300,6 +301,13 @@ sub _get_time_from_seconds {
 }
 
 
+sub _get_version {
+    my $v = $Time::ETA::VERSION;
+    $v = 'dev' if not defined $v;
+    return $v;
+}
+
+
 1;
 
 __END__
@@ -312,7 +320,7 @@ Time::ETA - calculate estimated time of accomplishment
 
 =head1 VERSION
 
-version 1.0.0
+version 1.0.1
 
 =head1 SYNOPSIS
 
@@ -433,7 +441,7 @@ minutes and 44 seconds.
 This method returns the same number as get_remaining_seconds(), but in format
 that is easy for humans to understand.
 
-Method words the same as get_remaining_seconds(). In case it is not possible
+Method works the same as get_remaining_seconds(). In case it is not possible
 to calulate remaining time the method will die. You can use method
 can_calculate_eta() to find out if it is possible to get remaing time.
 
@@ -545,8 +553,16 @@ serialized $string, otherwise false value
     my $can_spawn = Time::ETA->can_spawn($string);
 
 Methos spawn() that is used to create object from the serialized $string dies
-in case the $string is incorrect. This method is added to the object to simply
-the check process.
+in case the $string is incorrect. This method is added to the object to
+simplify the check process.
+
+=begin comment _get_version
+
+To fix problem 'Use of uninitialized value $Time::ETA::VERSION' when working
+with code that is not build with Dist::Zilla.
+
+
+=end comment
 
 =head1 SEE ALSO
 

@@ -21,6 +21,7 @@ my %WriteMakefileArgs = (
   "NAME" => "Time::ETA",
   "PREREQ_PM" => {
     "Carp" => 0,
+    "Exporter" => 0,
     "Time::HiRes" => 0,
     "YAML" => 0,
     "strict" => 0,
@@ -29,7 +30,7 @@ my %WriteMakefileArgs = (
   "TEST_REQUIRES" => {
     "Test::More" => 0
   },
-  "VERSION" => "1.0.0",
+  "VERSION" => "1.0.1",
   "test" => {
     "TESTS" => "t/*.t"
   }

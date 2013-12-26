@@ -7,7 +7,7 @@ build_requires:
 configure_requires:
   ExtUtils::MakeMaker: 6.30
 dynamic_config: 0
-generated_by: 'Dist::Zilla version 4.300035, CPAN::Meta::Converter version 2.131560'
+generated_by: 'Dist::Zilla version 4.300038, CPAN::Meta::Converter version 2.131490'
 license: perl
 meta-spec:
   url: http://module-build.sourceforge.net/META-spec-v1.4.html
@@ -15,6 +15,7 @@ meta-spec:
 name: Time-ETA
 requires:
   Carp: 0
+  Exporter: 0
   Time::HiRes: 0
   YAML: 0
   strict: 0
@@ -23,4 +24,4 @@ resources:
   bugtracker: https://github.com/bessarabov/Time-ETA/issues
   homepage: https://github.com/bessarabov/Time-ETA
   repository: https://github.com/bessarabov/Time-ETA.git
-version: 1.0.0
+version: 1.0.1
