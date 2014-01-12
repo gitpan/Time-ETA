@@ -14,15 +14,12 @@ use Test::More;
 
 use Time::ETA::MockTime;
 
-no warnings 'redefine';
-*Time::ETA::gettimeofday = \&Time::ETA::MockTime::gettimeofday;
-
 # global vars
 my $true = 1;
 my $false = '';
 
 my $precision = 0.1;
-my $microseconds = 1000000;
+my $microseconds = 1_000_000;
 
 my $tests = [
     {
@@ -42,6 +39,7 @@ my @precise_immutable_methods = qw(
     get_completed_percent
     is_completed
     can_calculate_eta
+    is_paused
 );
 
 my @inprecise_immutable_methods = qw(
@@ -70,8 +68,9 @@ sub compare_objects {
     }
 
     foreach my $method (@inprecise_immutable_methods) {
-        next if $method eq "get_remaining_seconds"
-            and $params{passed_milestones} == 0;
+        if($method eq "get_remaining_seconds") {
+            next if $params{passed_milestones} == 0;
+        }
 
         my $diff = $params{original}->$method()
             - $params{respawned}->$method();
@@ -94,7 +93,10 @@ sub check_fresh_object {
     croak "Expected to get 'start_time'" unless defined $params{start_time};
 
     my $original_eta = $params{original};
-    my $respawned_eta = Time::ETA->spawn($original_eta->serialize());
+
+    my $data = $original_eta->serialize();
+    ok(Time::ETA->can_spawn($data), 'can_spawn() return true');
+    my $respawned_eta = Time::ETA->spawn($data);
 
     foreach my $name ("original", "respawned") {
         my $eta;
@@ -184,21 +186,22 @@ sub check_object_in_progress {
             "In $name object after $params{done} milestones can_calculate_eta() return true",
         );
 
-        my $remainig_seconds = $eta->get_remaining_seconds();
+        my $remaining_seconds = $eta->get_remaining_seconds();
         my $number_of_tasks_left = $params{milestones} - $params{done};
         my $current_time = [gettimeofday()];
         my $estimated_time = $number_of_tasks_left
-            * ( tv_interval($params{start_time}, $current_time) / $params{done} );
+            * ( tv_interval($params{start_time}, $current_time) / $params{done});
         ok(
-            abs($remainig_seconds - $estimated_time) < $precision,
-            "In $name object after $params{done} milestones got correct remainig time $remainig_seconds"
+            abs($remaining_seconds - $estimated_time) < $precision,
+            "In $name object after $params{done} milestones got correct remainig time $remaining_seconds"
         );
 
         my $elapsed_seconds = $eta->get_elapsed_seconds();
-        ok(
-            abs(
-                tv_interval($params{start_time}, $current_time) - $elapsed_seconds
-            ) < $precision,
+        my $elapsed_addition = 0;
+
+        is(
+            tv_interval($params{start_time}, $current_time),
+            $elapsed_seconds,
             "In $name object after $params{done} milestones got correct elapsed seconds $elapsed_seconds"
         );
 
@@ -255,11 +258,11 @@ sub check_completed_object {
             "In $name completed object get_remaining_time() return '0:00:00'",
         );
 
+# TODO bes
         my $elapsed_seconds = $eta->get_elapsed_seconds();
-        ok(
-            abs(
-                tv_interval($params{start_time}, $params{end_time}) - $elapsed_seconds
-            ) < $precision,
+        is(
+            tv_interval($params{start_time}, $params{end_time}),
+            $elapsed_seconds,
             "In $name completed object got correct elapsed seconds $elapsed_seconds"
         );
 
@@ -277,6 +280,9 @@ sub check_completed_object {
 
 # main
 sub main {
+    no warnings 'redefine';
+    *Time::ETA::gettimeofday = \&Time::ETA::MockTime::gettimeofday;
+
     ok($true, "Loaded ok");
 
     foreach my $test (@{$tests}) {
@@ -318,7 +324,6 @@ sub main {
                     milestones => $test->{count},
                 );
             }
-
         }
 
         my $end_time = [gettimeofday()];

@@ -1,6 +1,6 @@
 package Time::ETA::MockTime;
 {
-  $Time::ETA::MockTime::VERSION = '1.0.1';
+  $Time::ETA::MockTime::VERSION = '1.1.0';
 }
 
 # ABSTRACT: make it possible to test time
@@ -45,11 +45,18 @@ sub usleep ($) {
 }
 
 
-
 sub gettimeofday () {
     if (@mocked_time) {
         return wantarray ? @mocked_time : "$mocked_time[0].$mocked_time[1]";
     }
+}
+
+
+sub set_mock_time  {
+    my ($sec, $ms) = @_;
+
+    $mocked_time[0] = $sec;
+    $mocked_time[1] = $ms;
 }
 
 1;
@@ -58,13 +65,15 @@ __END__
 
 =pod
 
+=encoding UTF-8
+
 =head1 NAME
 
 Time::ETA::MockTime - make it possible to test time
 
 =head1 VERSION
 
-version 1.0.1
+version 1.1.0
 
 =head1 DESCRIPTION
 
@@ -75,6 +84,8 @@ This is an internal thing that is used only in testing Perl module Time::ETA.
 =head1 usleep
 
 =head1 gettimeofday
+
+=head1 set_mock_time
 
 =head1 AUTHOR
 

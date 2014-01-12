@@ -1,6 +1,6 @@
 package Time::ETA;
 {
-  $Time::ETA::VERSION = '1.0.1';
+  $Time::ETA::VERSION = '1.1.0';
 }
 
 # ABSTRACT: calculate estimated time of accomplishment
@@ -20,7 +20,7 @@ use YAML;
 my $true = 1;
 my $false = '';
 
-our $SERIALIZATION_API_VERSION = 2;
+our $SERIALIZATION_API_VERSION = 3;
 
 
 sub new {
@@ -33,7 +33,9 @@ sub new {
 
     $self->{_milestones} = $params{milestones};
     $self->{_passed_milestones} = 0;
+    $self->{_elapsed} = 0;
     $self->{_start} = [gettimeofday];
+    $self->{_is_paused} = $false;
 
     return $self;
 }
@@ -61,8 +63,8 @@ sub get_remaining_seconds {
 
     return 0 if $self->is_completed();
 
-    my $elapsed_before_milestone = tv_interval($self->{_start}, $self->{_miliestone_pass});
-    my $elapsed_after_milestone = tv_interval($self->{_miliestone_pass}, [gettimeofday()]);
+    my $elapsed_before_milestone = tv_interval($self->{_start}, $self->{_milestone_pass});
+    my $elapsed_after_milestone = tv_interval($self->{_milestone_pass}, [gettimeofday()]);
 
     my $remaining_milestones = $self->{_milestones} - $self->{_passed_milestones};
 
@@ -112,7 +114,7 @@ sub pass_milestone {
 
     my $dt = [gettimeofday];
 
-    $self->{_miliestone_pass} = $dt;
+    $self->{_milestone_pass} = $dt;
 
     if ($self->{_passed_milestones} == $self->{_milestones}) {
         $self->{_end} = $dt;
@@ -133,6 +135,48 @@ sub can_calculate_eta {
 }
 
 
+sub pause {
+    my ($self) = @_;
+
+    croak "The object is already paused. Can't pause paused. Stopped" if $self->is_paused();
+
+    my $elapsed_seconds = tv_interval($self->{_start}, [gettimeofday]);
+    $self->{_elapsed} += $elapsed_seconds;
+    $self->{_start} = undef;
+
+    $self->{_is_paused} = $true;
+
+    return $false;
+}
+
+
+sub is_paused {
+    my ($self) = @_;
+
+    return $self->{_is_paused};
+}
+
+
+sub resume {
+    my ($self, $string) = @_;
+
+    croak "The object isn't paused. Can't resume. Stopped" if not $self->is_paused();
+
+    # Setting the start time
+    # Start time is the current time minus time that has already pass
+    $self->{_start} = [gettimeofday];
+    my $integer = int($self->{_elapsed});
+    my $decimal = sprintf("%.6f", ($self->{_elapsed} - $integer));
+    $self->{_start}->[0] -= $integer;
+    $self->{_start}->[1] -= $decimal * 1_000_000;
+
+    $self->{_elapsed} = 0;
+    $self->{_is_paused} = $false;
+
+    return $false;
+}
+
+
 sub serialize {
     my ($self) = @_;
 
@@ -141,8 +185,10 @@ sub serialize {
         _milestones => $self->{_milestones},
         _passed_milestones => $self->{_passed_milestones},
         _start  => $self->{_start},
-        _miliestone_pass => $self->{_miliestone_pass},
+        _milestone_pass => $self->{_milestone_pass},
         _end  => $self->{_end},
+        _is_paused => $self->{_is_paused},
+        _elapsed => $self->{_elapsed},
     };
 
     my $string = Dump($data);
@@ -180,11 +226,13 @@ sub spawn {
     croak "Can't spawn Time::ETA object. Serialized data contains incorrect number of passed milestones. Stopped"
         if not _is_positive_integer_or_zero(undef, $data->{_passed_milestones});
 
-    _check_gettimeofday(
-        undef,
-        value => $data->{_start},
-        name => "start time"
-    );
+    if (not $data->{_is_paused}) {
+        _check_gettimeofday(
+            undef,
+            value => $data->{_start},
+            name => "start time"
+        );
+    }
 
     if (defined $data->{_end}) {
         _check_gettimeofday(
@@ -194,10 +242,10 @@ sub spawn {
         );
     }
 
-    if (defined $data->{_miliestone_pass}) {
+    if (defined $data->{_milestone_pass}) {
         _check_gettimeofday(
             undef,
-            value => $data->{_miliestone_pass},
+            value => $data->{_milestone_pass},
             name => "last milestone pass time"
         );
     }
@@ -206,8 +254,10 @@ sub spawn {
         _milestones => $data->{_milestones},
         _passed_milestones => $data->{_passed_milestones},
         _start  => $data->{_start},
-        _miliestone_pass => $data->{_miliestone_pass},
+        _milestone_pass => $data->{_milestone_pass},
         _end  => $data->{_end},
+        _is_paused => $data->{_is_paused},
+        _elapsed => $data->{_elapsed},
     };
 
     bless $self, $class;
@@ -302,8 +352,8 @@ sub _get_time_from_seconds {
 
 
 sub _get_version {
-    my $v = $Time::ETA::VERSION;
-    $v = 'dev' if not defined $v;
+    no warnings 'uninitialized';
+    my $v = "$Time::ETA::VERSION";
     return $v;
 }
 
@@ -314,13 +364,15 @@ __END__
 
 =pod
 
+=encoding UTF-8
+
 =head1 NAME
 
 Time::ETA - calculate estimated time of accomplishment
 
 =head1 VERSION
 
-version 1.0.1
+version 1.1.0
 
 =head1 SYNOPSIS
 
@@ -417,7 +469,7 @@ precise is the prediction.
 
 This method will die in case it haven't got enough information to calculate
 estimated time of accomplishment. The method will die untill pass_milestone()
-is run for the first time. AFter pass_milestone() run at least once,
+is run for the first time. After pass_milestone() run at least once,
 get_remaining_seconds() has enouth data to caluate ETA. To find out if ETA can
 be calculated you can use method can_calculate_eta().
 
@@ -485,7 +537,8 @@ you have specified in the object new() constructor.
 
     $eta->pass_milestone();
 
-You need to run this method at least once to make method
+You need to run this method at least once after start or after resuming
+(in dependence of what has been happen later) to make method
 get_remaining_seconds() work.
 
 =head2 can_calculate_eta
@@ -494,7 +547,7 @@ B<Get:> 1) $self
 
 B<Return:> $boolean
 
-This method returns bool value that that gives information if there is enough
+This method returns bool value that gives information if there is enough
 data in the object to calculate process estimated time of accomplishment.
 
 It will return true value if method pass_milestone() have been run at least
@@ -510,6 +563,47 @@ no data to calculate ETA.
 
 When the process is complete can_calculate_eta() returns true value, but
 get_remaining_seconds() return 0.
+
+=head2 pause
+
+B<Get:> 1) $self
+
+B<Return:> it returns nothing that can be used
+
+This method tells the object that execution of the task have been paused.
+
+Method dies in case the object is already paused.
+
+    $eta->pause();
+
+=head2 is_paused
+
+B<Get:> 1) $self
+
+B<Return:> $boolean
+
+This method returns bool value that gives information if the object is paused.
+
+It will return true if method pause() has been run and no resume() method
+was run after that. Otherwise it will return false.
+
+This method is used to check whether it is safe to run method resume().
+Method resume() dies in the case the object is not paused.
+
+    if ( $eta->is_paused() ) {
+        $eta->resume();
+    }
+
+=head2 resume
+
+B<Get:> 1) $self
+
+B<Return:> it returns nothing that can be used
+
+This method tells the object that execution of the task is continued
+after pause.
+
+If the object is not paused the method dies.
 
 =head2 serialize
 
@@ -583,6 +677,14 @@ with code that is not build with Dist::Zilla.
 =item L<Text::ProgressBar::ETA>
 
 =item L<Time::Progress>
+
+=back
+
+=head1 CONTRIBUTORS
+
+=over 4
+
+=item * Dmitry Lukiyanchuk
 
 =back
 
