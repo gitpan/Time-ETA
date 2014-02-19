@@ -11,12 +11,7 @@ BEGIN {
 use strict;
 use warnings FATAL => 'all';
 use Test::More;
-
-BEGIN {
-    if (!eval q{ use Test::Differences; 1 }) {
-        *eq_or_diff = \&is_deeply;
-    }
-}
+use Test::Differences;
 
 use Carp;
 use Capture::Tiny qw(capture_merged);
@@ -57,9 +52,6 @@ sub run_check {
 
 sub check {
     my (%params) = @_;
-
-    no warnings 'redefine';
-    *Time::ETA::gettimeofday = \&Time::ETA::MockTime::gettimeofday;
 
     my $output = capture_merged {
         run_check(

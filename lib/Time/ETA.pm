@@ -1,6 +1,6 @@
 package Time::ETA;
 {
-  $Time::ETA::VERSION = '1.1.0';
+  $Time::ETA::VERSION = '1.1.1';
 }
 
 # ABSTRACT: calculate estimated time of accomplishment
@@ -164,11 +164,9 @@ sub resume {
 
     # Setting the start time
     # Start time is the current time minus time that has already pass
-    $self->{_start} = [gettimeofday];
-    my $integer = int($self->{_elapsed});
-    my $decimal = sprintf("%.6f", ($self->{_elapsed} - $integer));
-    $self->{_start}->[0] -= $integer;
-    $self->{_start}->[1] -= $decimal * 1_000_000;
+    my $timeofday = [gettimeofday];
+    my $start = ($timeofday->[0] * 1_000_000 + $timeofday->[1]) - int($self->{_elapsed} * 1_000_000);
+    $self->{_start} = [int($start / 1_000_000), $start % 1_000_000];
 
     $self->{_elapsed} = 0;
     $self->{_is_paused} = $false;
@@ -364,15 +362,13 @@ __END__
 
 =pod
 
-=encoding UTF-8
-
 =head1 NAME
 
 Time::ETA - calculate estimated time of accomplishment
 
 =head1 VERSION
 
-version 1.1.0
+version 1.1.1
 
 =head1 SYNOPSIS
 
@@ -684,7 +680,7 @@ with code that is not build with Dist::Zilla.
 
 =over 4
 
-=item * Dmitry Lukiyanchuk
+=item * Dmitry Lukiyanchuk (WTERTIUS)
 
 =back
 

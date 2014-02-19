@@ -1,6 +1,6 @@
 package Time::ETA::MockTime;
 {
-  $Time::ETA::MockTime::VERSION = '1.1.0';
+  $Time::ETA::MockTime::VERSION = '1.1.1';
 }
 
 # ABSTRACT: make it possible to test time
@@ -21,6 +21,14 @@ our @EXPORT = @EXPORT_OK;
 
 our @mocked_time = Time::HiRes::gettimeofday();
 my $microseconds_in_second = 1_000_000;
+
+{
+    no strict 'refs';
+    no warnings 'redefine';
+
+    my @packages_having_gettimeofday = grep {defined(&{$_ . '::gettimeofday'})} (map {s'\.pm''; s'/'::'g; $_} keys(%INC)), 'main';
+    *{$_ . '::gettimeofday'} = \&Time::ETA::MockTime::gettimeofday foreach @packages_having_gettimeofday;
+}
 
 
 sub sleep {
@@ -65,15 +73,13 @@ __END__
 
 =pod
 
-=encoding UTF-8
-
 =head1 NAME
 
 Time::ETA::MockTime - make it possible to test time
 
 =head1 VERSION
 
-version 1.1.0
+version 1.1.1
 
 =head1 DESCRIPTION
 

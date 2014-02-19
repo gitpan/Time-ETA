@@ -11,12 +11,7 @@ BEGIN {
 use strict;
 use warnings FATAL => 'all';
 use Test::More;
-
-BEGIN {
-    if (!eval q{ use Test::Differences; 1 }) {
-        *eq_or_diff = \&is_deeply;
-    }
-}
+use Test::Differences;
 
 use Capture::Tiny qw(capture_merged);
 use Time::ETA::MockTime;
@@ -48,9 +43,6 @@ sub sample_from_pod {
 }
 
 sub check_sample_from_pod {
-
-    no warnings 'redefine';
-    *Time::ETA::gettimeofday = \&Time::ETA::MockTime::gettimeofday;
 
     my $output = capture_merged {
         sample_from_pod();
